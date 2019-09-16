@@ -1,0 +1,17 @@
+pipeline {
+agent any
+    stages {
+        stage("build") {
+            steps {
+                parallel (
+                 "<lablel>" : {  
+                build('<jobname1>')
+                 },
+                "<label2>1" : {
+                build('<jobname2>')
+                }
+                )
+            }
+        }
+    }
+}
