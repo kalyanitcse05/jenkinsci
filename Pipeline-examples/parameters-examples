@@ -1,0 +1,49 @@
+pipeline {
+    agent any
+    parameters {
+      choice(choices: 'SAN\nDEV\nQA\nUAT\n', description: 'Please select the environment ', name: 'DEPLOY')
+booleanParam defaultValue: false, description: 'Do you want to perform rollback ?  (3 Previous deployments will be prompted at particular stage)', name: 'ROLLBACK'
+    }
+    stages{
+    stage('checkout')
+    {
+      steps{
+        checkout scm
+        println "${env.WORKSPACE}"
+        }
+      }
+      stage('build')
+      {
+      steps{
+         script{env.DEPLOY_ENV = "SAN"}      
+        }
+      }
+      
+      stage('Approval Deploy to QA') {
+ agent none
+       when {  
+                expression { params.DEPLOY == 'QA' }
+             }
+        steps {
+            script {
+                mail (to: 'abcs@gmail.com',
+              subject: "Job '${env.JOB_NAME}' (${env.BUILD_NUMBER}) is waiting for your Approval",
+              body: "Please go to ${env.BUILD_URL}console.");
+              timeout(time: 10, unit: 'MINUTES') {
+              input message: 'Do you want to deploy to QA', OK: true, submitter: "name"
+	      }
+                env.DEPLOY_TO_QA = 'true'
+            }
+        }
+    }
+    stage('rollback'){
+      when {  
+                expression { params.ROLLBACK == 'true' }
+             } 
+             steps{
+               script { echo "rollback is enabled" }
+             }
+         }
+    }
+    
+    }
