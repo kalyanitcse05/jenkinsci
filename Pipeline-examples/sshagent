@@ -1,0 +1,35 @@
+pipeline{
+    agent any
+    stages{
+        stage('SSH auth test'){
+        steps{
+            script{
+                
+            echo "This is a sample pipeline to test ssh authentication"
+             //JCS_credID  credential id from Jenkins credentials
+               sshagent(['JCS_credID'])  {
+                 for (i in ['10.10.0.12']){
+	     sh "ssh  -o StrictHostKeyChecking=no user@${i} ls -lrt  "
+	     sh "ssh -v -o StrictHostKeyChecking=no user@${i} touch /tmp/kal"
+		                    }
+               }
+               sshagent(['QA_credID'])  {
+                 for (i in ['system1_name']){
+	     sh "ssh -v -o StrictHostKeyChecking=no svc_uam_security@${i} ls -lrt  "
+       sh "ssh -o StrictHostKeyChecking=no svc_uam_security@${i} touch /tmp/test_qa"
+
+		                  }
+               }
+               sshagent(['DEV_credID'])  {
+                 for (i in ['system2_name']){
+	     sh "ssh -v -o StrictHostKeyChecking=no user@${i} ls -lrt  "
+       sh "ssh -o StrictHostKeyChecking=no user@${i} touch /tmp/test_dev"
+
+		                  }
+               }              
+            }//script
+            
+        }//end of steps
+        }//end of stage
+    }//end of stages
+}//end of pipeline
