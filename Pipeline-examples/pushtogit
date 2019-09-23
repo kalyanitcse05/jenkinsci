@@ -1,0 +1,37 @@
+pipeline{
+   agent any
+    stages{
+           stage(modify){
+           steps
+           {
+               script{
+                  // sh ' echo "Approved" > approval-status.txt '
+                  // sh 'git commit -am " Approval status"'
+                  withCredentials([usernamePassword(credentialsId: 'user1-id', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')])
+                  {
+                      script{
+                          env.encodepass=URLEncoder.encode(GIT_PASSWORD, "UTF-8")
+
+                      }
+                  sh '''dd=$(date "+%Y%m%d%H%M%S")
+             echo "first"    
+             pwd
+             rm -rf exrepo
+         
+           git clone https://${GIT_USERNAME}:${encodepass}@github.com/tmp/exrepo.git
+pwd
+git remote set-url origin https://${GIT_USERNAME}:${encodepass}@github.com/tmp/exrepo.git
+git status
+git pull
+git push
+rm -rf exrepo
+'''
+                  }
+               }
+       
+           }
+           
+       }
+       
+    }//stages
+}//pipelien
