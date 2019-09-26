@@ -1,0 +1,162 @@
+//@Library('ITOps-Jenkins-Libraries@master') _
+import groovy.json.JsonSlurperClassic
+
+def timeOut = false
+def userInput = ''
+
+pipeline {
+    agent any
+    parameters {
+      choice(choices: 'SAN\nDEV\nQA\nUAT\n', description: 'Please select the environment ', name: 'ENV_DEPLOY')
+booleanParam defaultValue: false, description: 'Do you want to perform rollback ?  (3 Previous deployments will be prompted at particular stage)', name: 'ROLLBACK'
+    }
+    environment {
+    TEST_CONFIG_ROOT = '${env.WORKSPACE}/testsE2e/src/main/resources'
+}
+stages {
+      stage('Checkout external proj') {
+         steps {
+          script {
+	        println "${env.WORKSPACE}"
+            	checkout scm
+            }
+          }
+      }
+
+      stage('Initialization') {
+          	steps {
+              	dir('pom/relative/path/from/repo/') {
+                    		script {
+                    			echo "[INFO] Loading JSON configuration from : pipeline.json"
+                    			inputFile = readFile("pipeline.json")
+                    			parsedJson = new JsonSlurperClassic().parseText(inputFile)
+                    			echo "[INFO] Done Loading JSON configuration"
+                    	}
+                    }
+          	}
+      }
+
+     stage('Build using OJDeploy') {
+            steps{
+              	dir('pom/relative/path/from/repo/') {
+              	 buildOJDeploy(parsedJson,true)
+              	}
+            }
+      }
+
+   stage('Deploy to SANDBOX') {
+  			 steps{
+	                   echo "Deploying to SANDBOX"
+                           script{env.ORACLE_DEPLOY_ENV = "SAN"}
+                          //copy ear file to the server and use curl install the server side
+			  deploy4(parsedJson,'SAN','svc_uam_security','jcs-console')
+  			 }
+     } 
+     stage('Approval Deploy to QA') {
+           when {  
+                expression { params.ENV_DEPLOY != 'SAN' }
+             }
+     agent none
+        steps {
+            script {
+	        mail (to: 'mail@gmail.com',
+                subject: "APPROVAL REQUEST:Job '${env.JOB_NAME}' (${env.BUILD_NUMBER}) is ready for your approval", 
+		mimeType: 'text/html',
+                body: """Please click <a href="${env.BUILD_URL}input/">here</a> to approve!""");
+
+		try{	
+                timeout(time: 5, unit: 'MINUTES') {
+		 wrap([$class: 'BuildUser']) {
+		   userInput = input(id: 'userInput',
+		   message: 'Do you want to release this build?',
+		   parameters: [[$class: 'hudson.model.PasswordParameterDefinition',
+		   defaultValue: "",
+		   name: 'password',
+		   description: "Password for '${BUILD_USER}'"]], OK: true, submitter: "name")
+		 }//end of wrap
+		   sh "echo User Input is : " + userInput
+		} //end of timeout
+		}catch(err) { // timeout reached or input false
+		    def user = err.getCauses()[0].getUser()
+		    if('SYSTEM' == user.toString()) { // SYSTEM means timeout.
+		       echo "System timeout before approving by the users"
+                       timeOut = true
+                    } else {
+                       echo "Aborted by: [${user}]"
+                    }
+		}//end of catch		
+		env.DEPLOY_TO_QA = 'true'
+           }
+	 }
+    }
+
+     stage('Deploy to QA') {
+       when {
+          environment name: 'DEPLOY_TO_QA', value: 'true'
+       }
+       steps{
+	  script {
+	   echo "QA: echo User Input is : " + userInput
+	   if (timeOut){
+	      echo "***No input was received before timeout"
+	   }
+	   else if ( userInput.toString() == 'pass123'){
+             echo "QA: ***Deploying to QA"
+             script{env.ORACLE_DEPLOY_ENV = "QA"}
+             //copy ear file to the server and use curl install at the server side
+	     //deploy4(parsedJson,'QA','user','jcs-console')
+           }
+	   else{
+	      echo "QA: ***This was not successful"
+	  }
+         }//end of script
+	}//end of steps     
+    }
+    
+    stage('Deploy to SIT') {
+       steps{
+         script {
+	   echo "SIT: echo User Input is : " + userInput
+	   if (timeOut){
+	      echo "***SIT: No input was received before timeout"
+	   }
+	   else if ( userInput.toString() == 'pass123'){
+             echo "SIT: ***Deploying to SIT"
+             script{env.ORACLE_DEPLOY_ENV = "SIT"}
+             //copy ear file to the server and use curl install the server side
+             //deploy4(parsedJson,'SIT','user','jcs-console')
+	  }
+	  else{
+	      echo "***SIT: This was not successful"
+	  }
+         }//end of script 
+
+      }// end of steps
+
+   } // end of stage
+   
+  stage('Deploy to UAT') {
+       steps{
+         script {
+	   echo "UAT: echo User Input is : " + userInput
+	   if (timeOut){
+	      echo "***UAT: No input was received before timeout"
+	   }
+	   else if ( userInput.toString() == 'pass123'){
+             echo "SIT: ***Deploying to UAT"
+             script{env.ORACLE_DEPLOY_ENV = "UAT"}
+             //copy ear file to the server and use curl install the server side
+             deploy4(parsedJson,'UAT','user','jcs-console')
+	  }
+	  else{
+	      echo "***SIT: This was not successful"
+	  }
+         }//end of script 
+
+      }// end of steps
+
+   } // end of stage
+
+  } // end of pipeline
+
+} //  end of stages
