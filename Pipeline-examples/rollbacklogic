@@ -1,0 +1,13 @@
+import groovy.json.JsonSlurper
+
+
+def jsonresp = "https://artifactory-bluemix.kp.org/artifactory/api/search/prop?oracle_env=dev&repos=mvn-local".toURL().getText(requestProperties: ['X-Result-Detail': 'info,properties'])
+
+
+def root = new JsonSlurper().parseText(jsonresp)
+
+def artifact_arr = root.results.reverse().take(4).drop(1)
+
+return artifact_arr.collect {
+  it.properties.version[0]
+}
