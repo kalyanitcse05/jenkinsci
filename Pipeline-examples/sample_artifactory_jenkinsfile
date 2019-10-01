@@ -1,0 +1,188 @@
+pipeline {
+ agent any
+ stages {
+ 
+ 
+    stage('Clean-Common') {
+   steps {
+    echo 'Cleaning: Common Components for SAM-'
+    dir('Java/SAM-App/Common') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn clean'
+    }
+   }
+  }
+ 
+   stage('Clean_Sampleapps') {
+   steps {
+    echo 'Cleaning: Sampleapp Project'
+    dir('Java/SAM-App/Sampleapp') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn clean'
+    }
+   }
+  }
+  
+   stage('Clean_PollerProcess') {
+   steps {
+    echo 'Cleaning: PollerProcess Project'
+    dir('Java/SAM-App/PollerProcess') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn clean'
+    }
+   }
+  }
+
+   stage('Clean_SAM-Analyzer') {
+   steps {
+    echo 'Cleaning: SAM-Analyzer Project'
+    dir('Java/SAM-App/SAM-Analyzer') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn clean'
+    }
+   }
+  }
+
+   stage('Build-Common') {
+   steps {
+    echo 'Building: Common Components for SAM-'
+    dir('Java/SAM-App/Common') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn  install -am -DskipTests=true '
+    }
+   }
+  }
+
+   stage('Build-PollerProcess') {
+   steps {
+    echo 'Building: PollerProcess Components for SAM-'
+    dir('Java/SAM-App/PollerProcess') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn  install -am -DskipTests=true '
+    }
+   }
+  }  
+ 
+  stage('Build_Sampleapps') {
+   steps {
+    echo 'Building: Sampleapp Projec'
+    dir('Java/SAM-App/Sampleapp') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install -am -DskipTests=true '
+    }
+   }
+  }
+
+  stage('Build_SAM-Analyzer') {
+   steps {
+    echo 'Building: SAM-Analyzer Project'
+    dir('Java/SAM-App/SAM-Analyzer') {
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install:install-file -Dfile=libs/identitydirectory-1.0.0.jar -DgroupId=org.kp -DartifactId=identitydirectory -Dversion=1.0.0 -Dpackaging=jar'
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install:install-file -Dfile=libs/idxuserrole-1.0.0.jar -DgroupId=org.kp -DartifactId=idxuserrole -Dversion=1.0.0 -Dpackaging=jar'
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install:install-file -Dfile=libs/weblogic-servlet-1.0.0.jar -DgroupId=com.oracle -DartifactId=weblogic-servlet -Dversion=1.0.0 -Dpackaging=jar'
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install:install-file -Dfile=libs/jps-api-1.0.0.jar -DgroupId=org.kp -DartifactId=jps-api -Dversion=1.0.0 -Dpackaging=jar'
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install:install-file -Dfile=libs/wls-api-1.0.0.jar -DgroupId=com.oracle -DartifactId=wls-api -Dversion=1.0.0 -Dpackaging=jar'
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install:install-file -Dfile=libs/wlthint3client-1.0.0.jar -DgroupId=org.kp -DartifactId=wlthint3client -Dversion=1.0.0 -Dpackaging=jar'
+     sh '/apps/jenkins-agent/tools/hudson.tasks.Maven_MavenInstallation/Maven352/bin/mvn install -am -DskipTests=true '
+    }
+   }
+  }
+
+  stage('Artifactory Upload/Download') {
+   steps {
+    echo 'Uploading: into Artifactory'
+    script {
+     def server = Artifactory.server('bluemix')
+     def buildInfo = Artifactory.newBuildInfo()
+     buildInfo.env.capture = true
+     buildInfo.name = 'Sampleapp'
+     buildInfo.number = env.BUILD_NUMBER
+     echo "${env.BUILD_NUMBER}"
+     buildInfo.retention maxBuilds: 10
+     def uploadSpec = """
+     {
+     "files": [
+      {
+       "pattern": "Java/SAM-App/Common/deploy/Common-0.0.1-SNAPSHOT.jar",
+       "target": "local-snapshot/SAM-/Common-1.0.${env.BUILD_NUMBER}.jar"
+      },
+     {
+       "pattern": "Java/SAM-App/Sampleapp/deploy/Sampleapp-0.0.1-SNAPSHOT-fieldglass.zip",
+       "target": "local-snapshot/Sampleapp/Sampleapp-1.0.${env.BUILD_NUMBER}-fieldglass.zip"
+      },
+      {
+       "pattern": "Java/SAM-App/Sampleapp/deploy/Sampleapp-0.0.1-SNAPSHOT-oacs.zip",
+       "target": "local-snapshot/Sampleapp/Sampleapp-1.0.${env.BUILD_NUMBER}-oacs.zip"
+      },
+      {
+       "pattern": "Java/SAM-App/Sampleapp/deploy/Sampleapp-0.0.1-SNAPSHOT-rolesengine.zip",
+       "target": "local-snapshot/Sampleapp/Sampleapp-1.0.${env.BUILD_NUMBER}-rolesengine.zip"
+      },
+      {
+       "pattern": "Java/SAM-App/Sampleapp/deploy/Sampleapp-0.0.1-SNAPSHOT-rolesengine_exec.zip",
+       "target": "local-snapshot/Sampleapp/Sampleapp-1.0.${env.BUILD_NUMBER}-rolesengine_exec.zip"
+      },
+      {
+       "pattern": "Java/SAM-App/Sampleapp/deploy/Sampleapp-0.0.1-SNAPSHOT-email.zip",
+       "target": "local-snapshot/Sampleapp/Sampleapp-1.0.${env.BUILD_NUMBER}-email.zip"
+      }
+      ,
+      {
+       "pattern": "Java/SAM-App/Sampleapp/deploy/Sampleapp-0.0.1-SNAPSHOT-salesforce.zip",
+       "target": "local-snapshot/Sampleapp/Sampleapp-1.0.${env.BUILD_NUMBER}-salseforce.zip"
+      }
+      ,      
+      {
+       "pattern": "Java/SAM-App/PollerProcess/deploy/SAM-_dev.zip",
+       "target": "local-snapshot/PollerProcess/SAM-_dev_${env.BUILD_NUMBER}.zip"
+      }
+      ,      
+      {
+       "pattern": "Java/SAM-App/PollerProcess/deploy/SAM-_qa.zip",
+       "target": "local-snapshot/PollerProcess/SAM-_qa_${env.BUILD_NUMBER}.zip"
+      }
+      ,      
+      {
+       "pattern": "Java/SAM-App/PollerProcess/deploy/SAM-_perf.zip",
+       "target": "local-snapshot/PollerProcess/SAM-_perf_${env.BUILD_NUMBER}.zip"
+      }
+      ,      
+      {
+       "pattern": "Java/SAM-App/SAM-Analyzer/deploy/SAM-_analyzer_dev.zip",
+       "target": "local-snapshot/SAM-Analyzer/SAM-_analyzer_dev_${env.BUILD_NUMBER}.zip"
+      }
+      ,      
+      {
+       "pattern": "Java/SAM-App/SAM-Analyzer/deploy/SAM-_analyzer_qa.zip",
+       "target": "local-snapshot/SAM-Analyzer/SAM-_analyzer_qa_${env.BUILD_NUMBER}.zip"
+      }
+      ,      
+      {
+       "pattern": "Java/SAM-App/SAM-Analyzer/deploy/SAM-_analyzer_perf.zip",
+       "target": "local-snapshot/SAM-Analyzer/SAM-_analyzer_perf_${env.BUILD_NUMBER}.zip"
+      }
+
+     ]
+    }
+    """
+    server.upload(uploadSpec)
+    server.publishBuildInfo buildInfo
+
+    echo 'Uploaded to  Artifactory'
+    def downloadSpec = """
+    {
+    "files": [{
+      "pattern": "local-snapshot/Sampleapp/Sampleapp-1.0.${env.BUILD_NUMBER}*.zip",
+      "target": "download/"
+     },
+     {
+      "pattern": "local-snapshot/PollerProcess/SAM-_${env.BUILD_NUMBER}*.zip",
+      "target": "download/"
+     },
+     {
+      "pattern": "local-snapshot/SAM-Analyzer/SAM-_analyzer_${env.BUILD_NUMBER}*.zip",
+      "target": "download/"
+     }
+    ]
+   }
+   echo buildInfo.number
+   """
+   server.download(downloadSpec)
+  }
+ }
+}
+}
+}
